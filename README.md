@@ -1,153 +1,131 @@
 # Network Intrusion Detection Using Machine Learning
 
-An end-to-end, reproducible intrusion-detection experiment for normal versus malicious network connections in the KDD Cup 99 corrected dataset. The training program samples exactly 12,000 rows with `random_state=42`, evaluates supervised Random Forest and Support Vector Machine pipelines alongside Isolation Forest and One-Class SVM detectors from the previous notebook, and calculates metrics and plots from held-out predictions.
+A Python project that compares supervised classifiers and unsupervised anomaly detectors on the KDD Cup 99 connection dataset. It includes a Streamlit interface for uploading data, exploring a sample, training models, reviewing metrics, and trying a single-connection prediction.
 
-## Problem statement
+> **Scope:** This is an educational benchmark project. KDD Cup 99 is an old, highly duplicated dataset; the reported scores should not be interpreted as expected performance on modern network traffic.
 
-Network intrusion detection must identify anomalous connections while balancing missed attacks and false alarms. This project treats the KDD attack categories as one `attack` class and the `normal` label as the `normal` class. Labels are not included among model inputs.
+## What it does
 
-## Objectives
-
-- Explore the sample, feature types, missing values, and attack-label distribution.
-- Apply reproducible cleaning, one-hot encoding, imputation, and scaling where needed.
-- Compare tuned Random Forest and SVM models with imbalance-aware class weights, plus Isolation Forest and One-Class SVM anomaly detectors.
-- Report held-out accuracy, precision, recall, F1, ROC-AUC, confusion matrices, ROC curves, and feature importance.
-- Save fitted end-to-end pipelines so new raw records receive the same preprocessing.
+- Loads the 42-column KDD Cup 99 connection data, including `.gz` files.
+- Selects a repeatable 12,000-row sample (`random_state=42`).
+- Cleans labels and features, then maps `normal` to 0 and all attack labels to 1.
+- Compares Random Forest and SVM classifiers with Isolation Forest and One-Class SVM detectors.
+- Tunes the supervised classifiers using three-fold cross-validation with F1 scoring.
+- Reports accuracy, precision, recall, F1, ROC-AUC, confusion matrices, ROC curves, and feature importance.
+- Saves fitted model pipelines and result files locally.
 
 ## Dataset
 
-Use the KDD Cup 99 corrected connection dataset file `kddcup.data.corrected`. Put it at `data/kddcup.data.corrected`, or provide its path at runtime. In Google Colab the default is `/content/kddcup.data.corrected`. The project reads it with `pandas.read_csv(path, header=None)` and then selects exactly 12,000 records using `sample(n=12000, random_state=42)`. The dataset itself is not distributed in this repository.
+Use the **KDD Cup 99 corrected connection-level dataset** (`kddcup.data.corrected` or its gzip-compressed version). It must contain the KDD connection records with 41 feature columns and one label column. The dataset is not included in this repository.
 
-## Technologies
+A catalog file named `KDD Cup 99.csv` is not the connection dataset and cannot be used for training.
 
-Python, Pandas, NumPy, scikit-learn, Matplotlib, Seaborn, joblib, Jupyter, Git, and GitHub.
+Place the dataset in `data/`, or pass its full path to the training command. This project has been run with `data/kddcup.data.gz`.
 
-## Workflow
+## Windows setup
 
-```text
-KDD Cup 99
-     ↓
-Data Loading
-     ↓
-12,000 Sample Selection
-     ↓
-Data Cleaning
-     ↓
-Encoding
-     ↓
-Feature Selection
-     ↓
-Train/Test Split
-     ↓
-Feature Scaling
-     ↓
-Random Forest + SVC + Isolation Forest + One-Class SVM
-     ↓
-Hyperparameter Tuning
-     ↓
-Prediction
-     ↓
-Evaluation
-     ↓
-Normal / Malicious Traffic
+Open PowerShell in this project folder and run:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
 
-Feature selection is provided as an optional `SelectKBest(mutual_info_classif)` helper; the default experiment retains all 41 input fields so that no feature information is discarded without evidence. Random Forest impurity importances show which transformed inputs were useful in the fitted forest.
+If PowerShell blocks virtual-environment activation, use the environment's Python directly instead:
 
-## Data preprocessing and leakage control
-
-The final `label` field is normalized (including stripping the KDD trailing period) and mapped to `target=0` for normal or `target=1` for every attack type. Numeric columns are safely coerced, invalid values become missing, and categorical values are normalized. Median/mode imputation and one-hot encoding are fitted inside each model pipeline, including separately within each cross-validation fold. The stratified 80/20 split is made before fitting. Numeric features and the full sparse feature matrix are scaled inside the SVM pipeline; Random Forest does not require scaling. `class_weight="balanced"` provides a simple training-only response to class imbalance.
-
-## Models and tuning
-
-- **Random Forest:** `n_estimators` controls the number of trees; `max_depth` limits tree depth and complexity; `random_state=42` makes randomized behavior reproducible. Grid search also checks minimum leaf size.
-- **SVM:** an RBF-kernel `SVC` with probability estimates for ROC-AUC; grid search checks `C` and `gamma`.
-- **Isolation Forest:** unsupervised detector with 200 trees and 30% contamination, matching the earlier KDD notebook's starting setting. Contamination directly affects its flagged anomaly share and should be checked against the desired false-alarm rate.
-- **One-Class SVM:** unsupervised RBF detector with `nu=0.10`; its decision score is inverted for ROC-AUC so larger scores indicate more anomalous traffic.
-
-Random Forest and SVC use three-fold `GridSearchCV` optimized for F1. F1 balances precision and recall; adjusting the objective or decision threshold can tune the precision-recall tradeoff and reduce false positives, but may increase missed attacks. The unsupervised detectors fit training features and their default thresholds are reported as-is.
-
-## Evaluation and results
-
-The program computes Accuracy, Precision, Recall, F1-score, ROC-AUC, confusion matrices, and ROC curves from the held-out test set for all four methods. It writes the comparison table to `results/model_comparison.csv`, fitted pipelines to `models/`, and plots under `results/`. The old notebook's IoT dataset cells are outside this KDD project. Its test-set-derived autoencoder threshold was omitted because it makes test evaluation optimistic; an autoencoder can be added with a threshold selected using training-only validation data. No results are prefilled or claimed: metrics depend on running the experiment with the actual dataset and installed library versions.
-
-## Install and run
-
-```bash
-python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-python -m pip install -r requirements.txt
-python src/train.py --data-path data/kddcup.data.corrected
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-In Colab, upload the dataset to `/content/kddcup.data.corrected`, install with `!pip install -r requirements.txt`, then run `!python src/train.py`. The training command saves tuned pipeline files to `models/` and generated plots/CSV metrics to `results/`. Training includes cross-validation and can take several minutes.
+## Train and evaluate
 
-## Streamlit app
+With the dataset at `data\kddcup.data.gz`:
 
-The beginner-friendly frontend lets a new user upload the KDD file, preview the deterministic 12,000-row sample, train and compare the four models, inspect plots, and try a single-record prediction.
+```powershell
+python src\train.py --data-path data\kddcup.data.gz
+```
 
-```bash
-python -m pip install -r requirements.txt
+Or specify a different file path:
+
+```powershell
+python src\train.py --data-path "C:\path\to\kddcup.data.corrected"
+```
+
+Training runs cross-validation and can take a few minutes. Successful runs save fitted pipelines in `models/` and metrics and charts in `results/`. Dataset, model, and generated result files are excluded from Git by `.gitignore`.
+
+## Launch the Streamlit app
+
+```powershell
 python -m streamlit run app.py
 ```
 
-The app opens in your browser. Upload the 42-column KDD Cup 99 connection dataset in the sidebar. The file named `KDD Cup 99.csv` that lists dataset descriptions is a catalog and cannot be used as the connection data. Training artifacts remain in the local `models/` and `results/` folders.
+Streamlit opens the app in your browser. Use the sidebar to upload the 42-column KDD connection dataset, then:
 
-For a prediction in Python after training:
+1. Review the reproducible sample and class balance in **Data overview**.
+2. Select **Train all four models**.
+3. Compare held-out metrics and charts in **Model results**.
+4. Use **Try a prediction** to classify a sample connection after training.
 
-```python
-from src.predict import predict_network_traffic
+The app has a dark theme configured in `.streamlit/config.toml`. The uploaded file is processed locally by the app; it is not sent to an external service.
 
-record = {
-    "duration": 0, "protocol_type": "tcp", "service": "http", "flag": "sf",
-    "src_bytes": 181, "dst_bytes": 5450,
-    # Remaining KDD features may be supplied; omitted fields are imputed.
-}
-print(predict_network_traffic(record, "models/random_forest.pkl"))
-```
+## Example results
 
-Output is `Normal Traffic` or `Malicious Traffic`. The saved artifact includes preprocessing as well as the estimator. Predictions require the same KDD feature schema and are not a substitute for validating a detector on current production traffic.
+One run using the fixed 12,000-row sample and an 80/20 stratified random split produced:
 
-## Project structure
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
+|---|---:|---:|---:|---:|---:|
+| Random Forest | 0.9992 | 1.0000 | 0.9990 | 0.9995 | 1.0000 |
+| SVM | 0.9988 | 0.9990 | 0.9995 | 0.9992 | 1.0000 |
+| Isolation Forest | 0.2596 | 0.6035 | 0.2340 | 0.3372 | 0.1665 |
+| One-Class SVM | 0.1650 | 0.3435 | 0.0409 | 0.0731 | 0.6806 |
+
+These are observed results from one sampled experiment, not a guarantee. KDD Cup 99 contains repeated records, and a random split can place very similar connections in both training and test sets. This can make supervised scores look unusually high. The unsupervised detectors also use preset contamination/`nu` values, so their performance is sensitive to threshold choice. Validate with deduplicated or time-based splits and newer data before drawing conclusions about generalization.
+
+## Outputs
+
+After training, generated files include:
+
+- `models/random_forest.pkl`, `models/svm.pkl`
+- `models/isolation_forest.pkl`, `models/one_class_svm.pkl`
+- `results/model_comparison.csv`
+- `results/roc_curve.png` and model confusion-matrix images
+- `results/class_distribution.png` and `results/feature_importance.png`
+- `results/feature_importance.csv`
+
+These outputs are generated locally and are not committed by default.
+
+## Project layout
 
 ```text
-network-intrusion-detection/
-├── data/README.md
+.
+├── .streamlit/config.toml       # Streamlit theme
+├── app.py                       # Browser interface
+├── data/README.md               # Dataset placement notes
 ├── notebooks/intrusion_detection.ipynb
-├── src/data_preprocessing.py
-├── src/feature_engineering.py
-├── src/train.py
-├── src/evaluate.py
-├── src/predict.py
-├── models/                  # fitted joblib pipeline artifacts after training
-├── results/                 # metrics and plots after training
+├── src/
+│   ├── data_preprocessing.py
+│   ├── feature_engineering.py
+│   ├── train.py
+│   ├── evaluate.py
+│   └── predict.py
 ├── requirements.txt
 └── README.md
 ```
 
-## Notebook
+## Tech stack
 
-Open `notebooks/intrusion_detection.ipynb` in Jupyter or Colab. It documents the same project modules, inspects the sample, and invokes the shared training workflow. Make sure the dataset path is available before running.
+Python, Pandas, NumPy, scikit-learn, Matplotlib, Seaborn, joblib, and Streamlit.
 
-## Future improvements
+## Limitations
 
-- Compare against newer intrusion datasets and test temporal/generalization splits.
-- Report per-attack-category performance and calibration, and choose thresholds based on an explicit false-alarm budget.
-- Explore cost-sensitive learning, explainability, drift monitoring, and inference latency.
-- Add experiment tracking and a deployment interface after validating real operational data.
+- KDD Cup 99 is historical and does not represent current network traffic or modern attack behavior.
+- The project combines all attack categories into a binary `attack` class.
+- The 12,000-row sample and random split are useful for a reproducible demo, but are not a deployment validation strategy.
+- Unsupervised detector thresholds need to be calibrated against an operational false-alarm target.
+- The prediction form fills unspecified features through the pipeline's imputers; useful real predictions require representative, complete connection data.
 
-## GitHub upload
+## License and dataset terms
 
-```bash
-git init
-git add README.md requirements.txt .gitignore data/README.md notebooks/ src/ results/.gitkeep
-git commit -m "Add network intrusion detection project"
-git branch -M main
-git remote add origin https://github.com/USERNAME/REPOSITORY.git
-git push -u origin main
-```
-
-Replace `USERNAME/REPOSITORY` with your GitHub repository. Dataset files and trained model binaries are ignored by default; publish them only if their licenses and your repository's size policy permit it.
-#   N e t w o r k - A n a m o l y - D e t e c t i o n - S y s t e m  
- 
+Check the licenses and usage terms for the code and dataset before redistributing them. The dataset is intentionally not bundled here.
